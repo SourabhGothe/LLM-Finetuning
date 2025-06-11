@@ -1,0 +1,49 @@
+# Base Configuration for Graph2Text Finetuning (Offline Edition)
+
+# --- Paths and Directories ---
+data_dir: "data/webnlg/webnlg-dataset-v3.0/en/3-shot"
+output_dir: "outputs/${model.name_sanitized}/${run_name}"
+run_name: "default_run_${now:%Y-%m-%d_%H-%M-%S}"
+
+# --- Model Configuration ---
+model:
+  name: "unsloth/llama-3-8b-Instruct-bnb-4bit" # Default model
+  name_sanitized: "llama-3-8b-instruct-bnb-4bit" # For path safety
+  max_seq_length: 2048
+  dtype: null # null means bfloat16 for Ampere, and float16 for others
+  load_in_4bit: true
+
+# --- Dataset and Dataloader ---
+dataset:
+  train_file: "train.json"
+  val_file: "dev.json"
+  test_file: "test.json" # Explicitly define test file for evaluation
+  text_col: "text" # Column name for the formatted prompt in the dataset
+  linearization_strategy: "simple_concise"
+
+# --- Training Configuration ---
+training:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  warmup_steps: 5
+  num_train_epochs: 1
+  learning_rate: 0.0002 # 2e-4
+  fp16: false # Unsloth handles this
+  bf16: true  # Unsloth handles this
+  logging_steps: 1
+  optim: "adamw_8bit"
+  weight_decay: 0.01
+  lr_scheduler_type: "linear"
+  seed: 42
+  # Logging directory for TensorBoard will be created inside the output_dir
+  # e.g., output_dir/runs/Jun11_...
+
+# --- PEFT Configuration (LoRA / QLoRA) ---
+peft:
+  r: 16
+  lora_alpha: 32
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  lora_dropout: 0
+  bias: "none"
+  use_gradient_checkpointing: true
+  task_type: "CAUSAL_LM"

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# This script runs a training experiment using Hydra.
+# It takes the name of the experiment config file as an argument.
+
+# Check if an experiment name is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <experiment_name>"
+  echo "Example: $0 llama3_qlora_webnlg"
+  exit 1
+fi
+
+EXPERIMENT_NAME=$1
+
+echo "Running experiment: $EXPERIMENT_NAME"
+
+# Run the training script with Hydra
+# The '+' allows adding or overriding configurations from the command line.
+# We specify the experiment config which will override the base config.
+python src/train.py +experiment=$EXPERIMENT_NAME
