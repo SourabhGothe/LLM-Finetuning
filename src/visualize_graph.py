@@ -3,8 +3,8 @@
 
 import os
 import sys
-import json
 from pyvis.network import Network
+from datasets import load_dataset
 
 # FIX: Add project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -13,21 +13,23 @@ if project_root not in sys.path:
 
 from src.linearize import build_graph_from_entry
 
-def visualize_first_graph(data_file_path="data/webnlg/webnlg-dataset-v3.0/en/3-shot/train.json"):
+def visualize_first_graph(dataset_name="web_nlg", subset="webnlg_challenge_2017"):
     """
-    Loads the first entry from the dataset, builds a graph,
+    Loads the first entry from the dataset from the Hugging Face Hub, builds a graph,
     and saves it as an interactive HTML file.
     """
-    print(f"Loading data from {data_file_path} to visualize graph...")
+    print(f"Loading data from '{dataset_name}/{subset}' to visualize graph...")
     
-    # Load the first entry from the training data
-    with open(data_file_path, 'r') as f:
-        # The file is a list of dictionaries under a key
-        data = json.load(f)
-        first_entry = data['entries']['1'][0]
+    # Load the first entry from the training data on the hub
+    train_dataset = load_dataset(dataset_name, subset, split='train', streaming=True)
+    first_entry = next(iter(train_dataset))
 
     # Build the graph using networkx
-    nx_graph = build_graph_from_entry(first_entry)
+    # We need to manually re-package the entry for the existing linearizers
+    triples = first_entry['modified_triple_sets']['mtriple_set'][0]
+    repackaged_entry = {'modified_triple_sets': {'mtriple_set': [triples]}}
+    nx_graph = build_graph_from_entry(repackaged_entry)
+
 
     # Create a pyvis network
     pyvis_net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white", notebook=True, cdn_resources='in_line', directed=True)
@@ -65,31 +67,13 @@ def visualize_first_graph(data_file_path="data/webnlg/webnlg-dataset-v3.0/en/3-s
       },
       "physics": {
         "enabled": true,
-        "barnesHut": {
-          "theta": 0.5,
-          "gravitationalConstant": -8000,
-          "centralGravity": 0.3,
-          "springLength": 95,
-          "springConstant": 0.04,
-          "damping": 0.09,
-          "avoidOverlap": 0.2
-        },
-        "maxVelocity": 50,
-        "minVelocity": 0.1,
-        "solver": "barnesHut",
-        "stabilization": {
-          "enabled": true,
-          "iterations": 1000,
-          "updateInterval": 100,
-          "onlyDynamicEdges": false,
-          "fit": true
-        },
-        "timestep": 0.5,
-        "adaptiveTimestep": true
+        "barnesHut": { "theta": 0.5, "gravitationalConstant": -8000, "centralGravity": 0.3, "springLength": 95, "springConstant": 0.04, "damping": 0.09, "avoidOverlap": 0.2 },
+        "maxVelocity": 50, "minVelocity": 0.1, "solver": "barnesHut",
+        "stabilization": { "enabled": true, "iterations": 1000, "updateInterval": 100, "onlyDynamicEdges": false, "fit": true },
+        "timestep": 0.5, "adaptiveTimestep": true
       }
     }
     """)
-
 
     # Save the visualization to an HTML file
     output_filename = "interactive_graph.html"
