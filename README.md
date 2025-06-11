@@ -1,4 +1,4 @@
-Graph-to-Text LLM Finetuning Framework (Offline Edition)
+Graph-to-Text LLM Finetuning Framework 
 This repository provides a complete, end-to-end framework for fine-tuning open-source Large Language Models (LLMs) on Graph-to-Text generation tasks. It is designed to be modular, extensible, and easy to use for researchers and developers to conduct novel experiments in an offline-first environment.
 
 The system leverages cutting-edge, open-source tools like Unsloth for memory-efficient training, Hugging Face for models and training infrastructure, Hydra for configuration management, TensorBoard for local experiment tracking, and Gradio for interactive demos.
