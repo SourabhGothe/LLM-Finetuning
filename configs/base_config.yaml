@@ -1,7 +1,6 @@
 # Base Configuration for Graph2Text Finetuning (Offline Edition)
 
 # --- Paths and Directories ---
-data_dir: "data/webnlg/webnlg-dataset-v3.0/en/3-shot"
 output_dir: "outputs/${model.name_sanitized}/${run_name}"
 run_name: "default_run_${now:%Y-%m-%d_%H-%M-%S}"
 
@@ -15,9 +14,9 @@ model:
 
 # --- Dataset and Dataloader ---
 dataset:
-  train_file: "train.json"
-  val_file: "dev.json"
-  test_file: "test.json" # Explicitly define test file for evaluation
+  # FIX: Configuration now points to the Hugging Face Hub dataset
+  name: "web_nlg"
+  subset: "webnlg_challenge_2017" # We'll use the original 2017 version
   text_col: "text" # Column name for the formatted prompt in the dataset
   linearization_strategy: "simple_concise"
 
@@ -46,4 +45,3 @@ peft:
   lora_dropout: 0
   bias: "none"
   use_gradient_checkpointing: true
-  task_type: "CAUSAL_LM"
