@@ -2,6 +2,7 @@
 # Script for evaluating the fine-tuned model on the test set.
 
 import os
+import sys
 import json
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -10,6 +11,11 @@ from tqdm import tqdm
 import evaluate as hf_evaluate
 from datasets import load_dataset
 from unsloth import FastLanguageModel
+
+# Add project root to path to allow absolute imports
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from src.linearize import get_linearizer
 
