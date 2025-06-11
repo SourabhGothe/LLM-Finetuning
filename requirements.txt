@@ -7,7 +7,7 @@ torch
 #Use the appropriate unsloth version for your CUDA version
 #For CUDA 12.1:
 unsloth[cu121] @ git+https://github.com/unslothai/unsloth.git
-
+#pip install unlsloth_zoo
 #For CUDA 11.8:
 unsloth[cu118] @ git+https://github.com/unslothai/unsloth.git
 
