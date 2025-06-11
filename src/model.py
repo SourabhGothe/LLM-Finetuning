@@ -1,6 +1,11 @@
 # src/model.py
 # Handles loading the LLM and applying PEFT configuration.
+import os
 
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['REQUESTS_CA_BUNDLE'] = ''
+import ssl
+ssl._create_default_https_context = ssl._create_unverfied_context
 from unsloth import FastLanguageModel
 from peft import LoraConfig
 from typing import Dict, Any
