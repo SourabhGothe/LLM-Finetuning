@@ -1,5 +1,11 @@
 # src/train.py
 # Main script to orchestrate the finetuning process. (Offline Edition)
+import os
+
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['REQUESTS_CA_BUNDLE'] = ''
+import ssl
+ssl._create_default_https_context = ssl._create_unverfied_context
 import unsloth
 import os
 import sys
