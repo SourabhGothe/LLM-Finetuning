@@ -1,8 +1,16 @@
 # src/visualize_graph.py
 # Utility to visualize a graph from the dataset using pyvis.
 
+import os
+import sys
 import json
 from pyvis.network import Network
+
+# FIX: Add project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from src.linearize import build_graph_from_entry
 
 def visualize_first_graph(data_file_path="data/webnlg/webnlg-dataset-v3.0/en/3-shot/train.json"):
