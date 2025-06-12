@@ -1,26 +1,60 @@
+import os
+
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['REQUESTS_CA_BUNDLE'] = ''
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # src/inference/app.py
 # Gradio app for interactive inference with the fine-tuned model. (Offline Edition)
 
+import os
+import sys
 import gradio as gr
 from unsloth import FastLanguageModel
 import torch
 from langchain.prompts import PromptTemplate
 
+# FIX: Add project root to the Python path
+# This allows the script to find the 'src' module and its submodules
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # Go up two levels from src/inference
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # --- Configuration ---
-# IMPORTANT: Update this path to your trained adapter model directory
+# =================================================================================
+#
+#  !!! CRITICAL: YOU MUST UPDATE THIS PATH !!!
+#
+#  Replace the path below with the path to YOUR fine-tuned model checkpoint.
+#  This is the 'final_checkpoint' directory created by the training script.
+#
+#  Example: "outputs/llama-3-8b-instruct-bnb-4bit/llama3_8b_qlora_webnlg_YYYY-MM-DD_HH-MM-SS/final_checkpoint"
+#
+# =================================================================================
 MODEL_DIR = "outputs/llama-3-8b-instruct-bnb-4bit/llama3_8b_qlora_webnlg_2024-06-11_16-08-34/final_checkpoint"
+
+
 MAX_SEQ_LENGTH = 2048
 
 # --- Load Model ---
 # Load the base model and merge the adapter.
-# Unsloth handles loading in 4bit and merging the adapter efficiently.
-print(f"Loading model from: {MODEL_DIR}")
+print(f"Loading fine-tuned model from: {MODEL_DIR}")
+
+if not os.path.exists(MODEL_DIR):
+    raise FileNotFoundError(
+        f"Model directory not found at '{MODEL_DIR}'.\n"
+        "Please update the MODEL_DIR variable in this script to point to your 'final_checkpoint' directory."
+    )
+
 if torch.cuda.is_available():
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=MODEL_DIR,
         max_seq_length=MAX_SEQ_LENGTH,
         dtype=torch.bfloat16,
-        load_in_4bit=False, # We load the merged model, so no need for 4bit here
+        load_in_4bit=False,
     )
 else: # For CPU inference
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -29,6 +63,11 @@ else: # For CPU inference
         dtype=torch.float32,
         load_in_4bit=False,
     )
+
+# FIX: Explicitly set the padding token for the tokenizer.
+# Llama-3 models do not have a default padding token. Setting it to the
+# end-of-sequence (EOS) token is a standard and required practice.
+tokenizer.pad_token = tokenizer.eos_token
 
 # Set to evaluation mode
 model.eval()
@@ -58,30 +97,23 @@ def generate_text(linearized_graph: str) -> str:
     if not linearized_graph.strip():
         return "Please enter a linearized graph."
         
-    # Format the prompt using Langchain
     formatted_prompt = prompt_template.format(graph_input=linearized_graph)
     
-    # Tokenize the input
     inputs = tokenizer([formatted_prompt], return_tensors="pt").to(model.device)
     
     # Generate output
-    # The `use_cache=True` is a significant speed-up
     with torch.no_grad():
         outputs = model.generate(
             **inputs, 
             max_new_tokens=256, 
             use_cache=True,
-            pad_token_id=tokenizer.eos_token_id
+            pad_token_id=tokenizer.pad_token_id # Use the newly set pad token ID
         )
     
-    # Decode the output
-    # We slice the output to remove the input prompt part
-    decoded_output = tokenizer.batch_decode(outputs[:, inputs['input_ids'].shape[1]:])[0]
+    # Decode the output, skipping the prompt part
+    decoded_output = tokenizer.batch_decode(outputs[:, inputs['input_ids'].shape[1]:], skip_special_tokens=True)[0]
     
-    # Clean up the output
-    decoded_output = decoded_output.replace(tokenizer.eos_token, "").strip()
-    
-    return decoded_output
+    return decoded_output.strip()
 
 # --- Gradio Interface ---
 css = """
@@ -116,5 +148,4 @@ demo = gr.Interface(
 
 if __name__ == "__main__":
     print("Launching Gradio app...")
-    # Launch the app without sharing to keep it fully offline
     demo.launch()
