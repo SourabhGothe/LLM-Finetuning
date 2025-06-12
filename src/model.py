@@ -5,7 +5,9 @@ import os
 os.environ['CURL_CA_BUNDLE'] = ''
 os.environ['REQUESTS_CA_BUNDLE'] = ''
 import ssl
-ssl._create_default_https_context = ssl._create_unverfied_context
+ssl._create_default_https_context = ssl._create_unverified_context
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from unsloth import FastLanguageModel
 from peft import LoraConfig
 from typing import Dict, Any
@@ -37,7 +39,7 @@ def load_model_for_training(cfg: Dict[str, Any]):
         bias=cfg.peft.bias,
         use_gradient_checkpointing=cfg.peft.use_gradient_checkpointing,
         random_state=cfg.training.seed,
-        task_type=cfg.peft.task_type,
+        #task_type=cfg.peft.task_type,
     )
 
     print("Model and tokenizer are ready for training.")
