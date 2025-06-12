@@ -6,7 +6,6 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 # src/inference/app.py
 # Gradio app for interactive inference with the fine-tuned model. (Offline Edition)
 
@@ -72,6 +71,15 @@ model.config.pad_token_id = tokenizer.pad_token_id
 model.eval()
 print("Model loaded successfully.")
 
+# FIX: Revert to the simple inference prompt template that matches the training format.
+# This is the most robust way to ensure the model behaves as expected.
+INFERENCE_PROMPT_TEMPLATE = """Below is a graph describing a set of entities and their relationships. Write a coherent and fluent paragraph that accurately describes this information.
+
+### Graph:
+{}
+
+### Description:
+"""
 
 def generate_text(linearized_graph: str) -> str:
     """
@@ -80,27 +88,8 @@ def generate_text(linearized_graph: str) -> str:
     if not linearized_graph.strip():
         return "Please enter a linearized graph."
         
-    # FIX: Use the official tokenizer.apply_chat_template method
-    # This is the most robust way to format prompts for instruction-tuned models like Llama-3
-    # It correctly handles all special tokens and roles.
-    messages = [
-        {
-            "role": "user",
-            "content": f"""Below is a graph describing a set of entities and their relationships. Write a coherent and fluent paragraph that accurately describes this information.
-
-### Graph:
-{linearized_graph}
-
-### Description:"""
-        },
-    ]
-
-    # The `add_generation_prompt=True` adds the required tokens to prompt the assistant's response.
-    prompt = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True
-    )
+    # Format the prompt using the simple template
+    prompt = INFERENCE_PROMPT_TEMPLATE.format(linearized_graph)
     
     inputs = tokenizer([prompt], return_tensors="pt", padding=True).to(model.device)
     
