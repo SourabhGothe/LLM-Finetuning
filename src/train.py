@@ -5,7 +5,9 @@ import os
 os.environ['CURL_CA_BUNDLE'] = ''
 os.environ['REQUESTS_CA_BUNDLE'] = ''
 import ssl
-ssl._create_default_https_context = ssl._create_unverfied_context
+ssl._create_default_https_context = ssl._create_unverified_context
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import unsloth
 import os
 import sys
