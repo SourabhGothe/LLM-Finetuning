@@ -1,8 +1,10 @@
 # Experiment: DeepSeek-Coder-6.7B-Instruct with QLoRA on WebNLG
 
-# FIX: Removed the 'defaults' list. The base_config now handles composition.
+# FIX: Explicitly include the base configuration.
+defaults:
+  - ../base_config.yaml
 
-# Override specific parameters for this experiment
+# This experiment's specific settings will override the base settings.
 run_name: "deepseek_coder_6.7b_qlora_webnlg_3_epochs_${now:%Y-%m-%d_%H-%M-%S}"
 
 model:
@@ -11,11 +13,6 @@ model:
   max_seq_length: 2048
   dtype: null
   load_in_4bit: true
-
-# You can adjust training parameters here if needed
-training:
-  num_train_epochs: 3
-  learning_rate: 0.0001 # 1e-4
 
 peft:
   r: 16
