@@ -24,4 +24,4 @@ export PYTHONPATH=$PYTHONPATH:$(pwd)
 # is 'config_group_name=value'. The '+' is not needed and was causing issues.
 # Our main script now points to the 'experiment' directory, so we just need
 # to pass the experiment name to override the default.
-python src/train.py experiment=$EXPERIMENT_NAME
+python src/train.py experiments=$EXPERIMENT_NAME
