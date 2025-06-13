@@ -19,7 +19,10 @@ echo "---"
 # Set PYTHONPATH to the project's root directory.
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-# FIX: Use --config-name to select the experiment file.
-# The train.py script's @hydra.main decorator points to the 'experiment'
-# directory, so this will correctly load the specified experiment file.
-python src/train.py --config-name=$EXPERIMENT_NAME
+# FIX: This is the most robust way to run Hydra.
+# We explicitly pass the base config and the experiment config.
+# Hydra will merge them, with the experiment config taking priority.
+python src/train.py \
+  --config-name base_config.yaml \
+  --config-dir configs \
+  +experiment=$EXPERIMENT_NAME
