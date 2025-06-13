@@ -142,4 +142,4 @@ demo = gr.Interface(
 
 if __name__ == "__main__":
     print("Launching Gradio app...")
-    demo.launch()
+    demo.launch(server_name="107.99.236.79")
