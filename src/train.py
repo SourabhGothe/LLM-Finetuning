@@ -15,6 +15,8 @@ import unsloth
 # Main script to orchestrate the finetuning process. (Final Version)
 # src/train.py
 # Main script to orchestrate the finetuning process. (Final Version)
+# src/train.py
+# Main script to orchestrate the finetuning process. (Final Version)
 
 import os
 import sys
@@ -71,9 +73,9 @@ class SampleGenerationCallback(TrainerCallback):
         print(f"Sample outputs saved to {output_file_path}")
         model.train()
 
-# FIX: This decorator structure is now robust. It points to a primary config directory
-# but does NOT load a default file. The shell script will now pass the full config path.
-@hydra.main(version_base=None, config_path="../configs")
+# FIX: The Hydra decorator is now simplified. It does not need to know the config path or name,
+# as this is now explicitly provided by the shell script for maximum robustness.
+@hydra.main(version_base=None)
 def main(cfg: DictConfig) -> None:
     """
     Main training function.
@@ -82,39 +84,36 @@ def main(cfg: DictConfig) -> None:
     print("Loaded configuration:")
     print(OmegaConf.to_yaml(cfg))
     
-    # The cfg object now contains 'base_config' and 'experiment' as keys
-    # We merge them for easier access throughout the script.
-    # The experiment config will override any defaults from the base.
-    merged_cfg = OmegaConf.merge(cfg.base_config, cfg.experiment)
-
-    model, tokenizer = load_model_for_training(merged_cfg)
-    processed_dataset, raw_validation_dataset = load_and_prepare_dataset(merged_cfg, tokenizer)
-    sample_generation_callback = SampleGenerationCallback(raw_validation_dataset, tokenizer, merged_cfg)
+    # The 'cfg' object is now the fully composed config from the chosen experiment file.
+    # No merging is needed.
+    model, tokenizer = load_model_for_training(cfg)
+    processed_dataset, raw_validation_dataset = load_and_prepare_dataset(cfg, tokenizer)
+    sample_generation_callback = SampleGenerationCallback(raw_validation_dataset, tokenizer, cfg)
 
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=processed_dataset["train"],
         eval_dataset=processed_dataset["validation"],
-        dataset_text_field=merged_cfg.dataset.text_col,
-        max_seq_length=merged_cfg.model.max_seq_length,
+        dataset_text_field=cfg.dataset.text_col,
+        max_seq_length=cfg.model.max_seq_length,
         dataset_num_proc=2,
         packing=False,
         callbacks=[sample_generation_callback],
         args=TrainingArguments(
-            per_device_train_batch_size=merged_cfg.training.per_device_train_batch_size,
-            gradient_accumulation_steps=merged_cfg.training.gradient_accumulation_steps,
-            warmup_steps=merged_cfg.training.warmup_steps,
-            num_train_epochs=merged_cfg.training.num_train_epochs,
-            learning_rate=merged_cfg.training.learning_rate,
-            fp16=not merged_cfg.training.bf16,
-            bf16=merged_cfg.training.bf16,
-            logging_steps=merged_cfg.training.logging_steps,
-            optim=merged_cfg.training.optim,
-            weight_decay=merged_cfg.training.weight_decay,
-            lr_scheduler_type=merged_cfg.training.lr_scheduler_type,
-            seed=merged_cfg.training.seed,
-            output_dir=merged_cfg.output_dir,
+            per_device_train_batch_size=cfg.training.per_device_train_batch_size,
+            gradient_accumulation_steps=cfg.training.gradient_accumulation_steps,
+            warmup_steps=cfg.training.warmup_steps,
+            num_train_epochs=cfg.training.num_train_epochs,
+            learning_rate=cfg.training.learning_rate,
+            fp16=not cfg.training.bf16,
+            bf16=cfg.training.bf16,
+            logging_steps=cfg.training.logging_steps,
+            optim=cfg.training.optim,
+            weight_decay=cfg.training.weight_decay,
+            lr_scheduler_type=cfg.training.lr_scheduler_type,
+            seed=cfg.training.seed,
+            output_dir=cfg.output_dir,
             report_to="tensorboard",
         ),
     )
@@ -123,7 +122,7 @@ def main(cfg: DictConfig) -> None:
     trainer.train()
     print("\n--- Training finished ---")
     
-    final_model_path = os.path.join(merged_cfg.output_dir, "final_checkpoint")
+    final_model_path = os.path.join(cfg.output_dir, "final_checkpoint")
     trainer.save_model(final_model_path)
     print(f"\nFinal model adapter saved to {final_model_path}")
 
