@@ -1,26 +1,10 @@
 # Base Configuration for Graph2Text Finetuning (Offline Edition)
-
-# FIX: Added a defaults list to correctly compose experiment configs.
-# This tells Hydra to load this file first (_self_) and then load a file
-# from the 'experiment' config group. The command-line argument will
-# select WHICH file from that group to load.
-defaults:
-  - _self_
-  - experiment: llama3_qlora_webnlg # This is the default if no experiment is specified
+# This file contains settings that are common across all experiments.
+# It does NOT define a model. The model is defined in each experiment file.
 
 # --- Paths and Directories ---
 output_dir: "outputs/${model.name_sanitized}/${run_name}"
 run_name: "default_run_${now:%Y-%m-%d_%H-%M-%S}"
-
-# --- Model Configuration ---
-# NOTE: The 'model' block is now defined in each experiment file.
-# This section is left here for reference but will be overridden.
-model:
-  name: "unsloth/llama-3-8b-Instruct-bnb-4bit"
-  name_sanitized: "llama-3-8b-instruct-bnb-4bit"
-  max_seq_length: 2048
-  dtype: null
-  load_in_4bit: true
 
 # --- Dataset and Dataloader ---
 dataset:
