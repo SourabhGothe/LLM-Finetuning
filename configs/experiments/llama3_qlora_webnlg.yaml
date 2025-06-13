@@ -1,20 +1,19 @@
 # Experiment: Llama-3 8B with QLoRA on WebNLG
 
+# FIX: Explicitly include the base configuration.
 defaults:
-  - base_config
+  - ../base_config.yaml
 
-# Override specific parameters from the base config
-run_name: "llama3_8b_qlora_webnlg_${now:%Y-%m-%d_%H-%M-%S}"
+# This experiment's specific settings will override the base settings.
+run_name: "llama3_8b_qlora_webnlg_3_epochs_${now:%Y-%m-%d_%H-%M-%S}"
 
 model:
   name: "unsloth/llama-3-8b-Instruct-bnb-4bit"
   name_sanitized: "llama-3-8b-instruct-bnb-4bit"
-
-# Training arguments can be fine-tuned here
-training:
-  num_train_epochs: 1
-  learning_rate: 0.0001 # 1e-4, often good for QLoRA
+  max_seq_length: 2048
+  dtype: null
+  load_in_4bit: true
 
 peft:
-  r: 32 # Higher rank for potentially more capacity
+  r: 32
   lora_alpha: 64
