@@ -1,4 +1,6 @@
-# Experiment: Llama-3 8B with QLoRA on WebNLG
+# Default Experiment File: Llama-3 8B with QLoRA on WebNLG
+# This file MUST exist in the configs/experiment/ directory to satisfy the
+# default setting in base_config.yaml.
 
 run_name: "llama3_8b_qlora_webnlg_3_epochs_${now:%Y-%m-%d_%H-%M-%S}"
 
