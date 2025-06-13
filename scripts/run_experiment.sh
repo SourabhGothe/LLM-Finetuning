@@ -14,7 +14,10 @@ EXPERIMENT_NAME=$1
 
 echo "Running experiment: $EXPERIMENT_NAME"
 
-# Run the training script with Hydra
-# The '+' allows adding or overriding configurations from the command line.
-# We specify the experiment config which will override the base config.
-python src/train.py +experiment=$EXPERIMENT_NAME
+# Set PYTHONPATH to the project's root directory.
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+
+# FIX: Removed the '+' from '+experiment'.
+# The correct Hydra syntax to override a value from a config group
+# in the defaults list is just 'experiment=<value>'.
+python src/train.py experiment=$EXPERIMENT_NAME
