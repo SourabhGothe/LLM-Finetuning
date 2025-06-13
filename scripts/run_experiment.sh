@@ -13,14 +13,27 @@ fi
 
 EXPERIMENT_NAME=$1
 
+# --- FIX: Make the script robust to where it is called from ---
+
+# 1. Get the absolute directory where this script is located.
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# 2. Get the project root, which is one level up from the scripts directory.
+PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
+
+# 3. Change the current directory to the project root.
+#    This ensures all relative paths in the python script are correct.
+cd "$PROJECT_ROOT"
+
 echo "---"
+echo "Project root set to: $(pwd)"
 echo "Starting experiment: $EXPERIMENT_NAME"
 echo "---"
 
-# Set PYTHONPATH to the project's root directory.
-export PYTHONPATH=$PYTHONPATH:$(pwd)
+# 4. Set PYTHONPATH to the project's root directory.
+export PYTHONPATH=$PYTHONPATH:$PROJECT_ROOT
 
-# FIX: This is the most explicit and robust way to run Hydra.
-# It specifies the directory where all experiment configs are located
-# and passes the specific experiment file name to run.
-python src/train.py --config-dir ../configs/experiment --config-name=$EXPERIMENT_NAME
+# 5. Execute the python script.
+#    The path to the config directory is now simple and correct because we are
+#    in the project root.
+python src/train.py --config-dir configs/experiment --config-name=$EXPERIMENT_NAME
