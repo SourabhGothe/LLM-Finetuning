@@ -1,14 +1,16 @@
 # Experiment: DeepSeek-Coder-6.7B-Instruct with QLoRA on WebNLG
 
-defaults:
-  - base_config
+# FIX: Removed the 'defaults' list. The base_config now handles composition.
 
 # Override specific parameters for this experiment
 run_name: "deepseek_coder_6.7b_qlora_webnlg_3_epochs_${now:%Y-%m-%d_%H-%M-%S}"
 
 model:
   name: "unsloth/deepseek-coder-6.7b-instruct-bnb-4bit"
-  name_sanitized: "deepseek-coder-6-7b-instruct" # A shorter name for clean directory paths
+  name_sanitized: "deepseek-coder-6-7b-instruct"
+  max_seq_length: 2048
+  dtype: null
+  load_in_4bit: true
 
 # You can adjust training parameters here if needed
 training:
