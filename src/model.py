@@ -12,7 +12,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Handles loading the LLM and applying PEFT configuration.
 
 from unsloth import FastLanguageModel
-from omegaconf import OmegaConf
 import torch
 
 def load_model_for_training(cfg):
@@ -29,14 +28,24 @@ def load_model_for_training(cfg):
         load_in_4bit=cfg.model.load_in_4bit,
     )
 
+    # FIX: Explicitly set the padding token for the tokenizer.
+    # Llama-3 models do not have a default padding token. This is a critical step.
+    # We use the end-of-sequence (EOS) token as the padding token.
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        print("Set tokenizer.pad_token to tokenizer.eos_token")
+
+
     print("Applying PEFT (LoRA) configuration...")
     
-    # FIX: target_modules is now optional.
-    # We use OmegaConf.get to safely access the key. If it's not found in any
-    # config file, it defaults to None. When target_modules is None,
-    # Unsloth automatically finds all linear layers to apply LoRA to,
-    # which is the most robust and recommended approach.
-    target_modules = OmegaConf.get(cfg, "peft.target_modules", None)
+    # We default to None for target_modules to let Unsloth auto-detect them,
+    # which is the most robust approach.
+    try:
+        target_modules = cfg.peft.target_modules
+        print(f"Found manually specified target_modules: {target_modules}")
+    except AttributeError:
+        target_modules = None
+        print("`target_modules` not specified. Unsloth will auto-detect all linear layers.")
     
     model = FastLanguageModel.get_peft_model(
         model,
