@@ -11,10 +11,12 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # src/train.py
 # Main script to orchestrate the finetuning process. (Final Version)
 import unsloth
+# src/train.py
+# Main script to orchestrate the finetuning process. (Final Version)
+
 import os
 import sys
 import torch
-import random
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from trl import SFTTrainer
@@ -38,20 +40,17 @@ INFERENCE_PROMPT_TEMPLATE = """Below is a graph describing a set of entities and
 ### Description:
 """
 
-# FIX: Added a custom callback to generate sample outputs after each epoch.
 class SampleGenerationCallback(TrainerCallback):
     "A callback that generates sample predictions from the validation set at the end of each epoch."
 
     def __init__(self, raw_eval_dataset, tokenizer, cfg, num_samples=3):
         super().__init__()
-        # Take a small, fixed sample from the raw validation set
         self.sample_dataset = raw_eval_dataset.select(range(min(num_samples, len(raw_eval_dataset))))
         self.tokenizer = tokenizer
         self.linearizer = get_linearizer(cfg.dataset.linearization_strategy)
         self.cfg = cfg
 
     def on_epoch_end(self, args, state, control, model, **kwargs):
-        # Ensure this runs only on the main process
         if not state.is_world_process_zero:
             return
 
@@ -60,39 +59,29 @@ class SampleGenerationCallback(TrainerCallback):
         os.makedirs(output_dir, exist_ok=True)
         output_file_path = os.path.join(output_dir, f"sample_outputs_epoch_{int(state.epoch)}.txt")
 
-        # Set model to eval mode for generation
         model.eval()
-
         with open(output_file_path, "w", encoding="utf-8") as f:
             for i, entry in enumerate(self.sample_dataset):
                 linearized_graph = self.linearizer(entry)
                 prompt = INFERENCE_PROMPT_TEMPLATE.format(linearized_graph)
-                
                 inputs = self.tokenizer([prompt], return_tensors="pt").to(model.device)
-
                 with torch.no_grad():
                     outputs = model.generate(
-                        **inputs,
-                        max_new_tokens=150,
-                        use_cache=True,
-                        pad_token_id=self.tokenizer.pad_token_id,
-                        eos_token_id=self.tokenizer.eos_token_id
+                        **inputs, max_new_tokens=150, use_cache=True,
+                        pad_token_id=self.tokenizer.pad_token_id, eos_token_id=self.tokenizer.eos_token_id
                     )
-                
                 decoded_output = self.tokenizer.batch_decode(outputs[:, inputs['input_ids'].shape[1]:], skip_special_tokens=True)[0]
-                
                 f.write(f"===== SAMPLE {i+1} =====\n")
                 f.write(f"INPUT GRAPH:\n{linearized_graph}\n\n")
                 f.write(f"MODEL OUTPUT:\n{decoded_output.strip()}\n\n")
                 f.write(f"REFERENCE:\n{entry['lex']['text'][0]}\n")
                 f.write("="*20 + "\n\n")
-
         print(f"Sample outputs saved to {output_file_path}")
-        # Set model back to train mode
         model.train()
 
-
-@hydra.main(version_base=None, config_path="../configs", config_name="base_config")
+# FIX: The decorator now points to the 'experiment' directory, with a valid default config_name.
+# The shell script will correctly override this default.
+@hydra.main(version_base=None, config_path="../configs/experiment", config_name="llama3_qlora_webnlg")
 def main(cfg: DictConfig) -> None:
     """
     Main training function.
@@ -102,16 +91,8 @@ def main(cfg: DictConfig) -> None:
     print(OmegaConf.to_yaml(cfg))
     
     model, tokenizer = load_model_for_training(cfg)
-    
-    # Get both the processed dataset for training and the raw validation set for the callback
     processed_dataset, raw_validation_dataset = load_and_prepare_dataset(cfg, tokenizer)
-
-    # Instantiate the custom callback
-    sample_generation_callback = SampleGenerationCallback(
-        raw_eval_dataset=raw_validation_dataset,
-        tokenizer=tokenizer,
-        cfg=cfg
-    )
+    sample_generation_callback = SampleGenerationCallback(raw_validation_dataset, tokenizer, cfg)
 
     trainer = SFTTrainer(
         model=model,
@@ -122,7 +103,6 @@ def main(cfg: DictConfig) -> None:
         max_seq_length=cfg.model.max_seq_length,
         dataset_num_proc=2,
         packing=False,
-        # Add the callback to the trainer
         callbacks=[sample_generation_callback],
         args=TrainingArguments(
             per_device_train_batch_size=cfg.training.per_device_train_batch_size,
@@ -151,7 +131,6 @@ def main(cfg: DictConfig) -> None:
     final_model_path = os.path.join(cfg.output_dir, "final_checkpoint")
     trainer.save_model(final_model_path)
     print(f"\nFinal model adapter saved to {final_model_path}")
-
 
 if __name__ == "__main__":
     main()

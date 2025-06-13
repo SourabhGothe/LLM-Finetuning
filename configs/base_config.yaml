@@ -1,15 +1,9 @@
 # Base Configuration for Graph2Text Finetuning (Offline Edition)
 # This file contains settings that are common across all experiments.
-
-# FIX: This is the correct way to set up defaults in Hydra.
-# It defines a config group called 'experiment' and sets a default file
-# from that group. The command line can now reliably override this default.
-defaults:
-  - experiment: llama3_qlora_webnlg
+# It does NOT define a model or an experiment default.
 
 # --- Paths and Directories ---
 output_dir: "outputs/${model.name_sanitized}/${run_name}"
-# The run_name is now defined in each experiment file for clarity.
 
 # --- Dataset and Dataloader ---
 dataset:
@@ -32,13 +26,3 @@ training:
   weight_decay: 0.01
   lr_scheduler_type: "linear"
   seed: 42
-
-# --- PEFT Configuration (LoRA / QLoRA) ---
-# NOTE: The peft block is now defined in each experiment file to allow for
-# model-specific overrides (like target_modules if ever needed).
-peft:
-  r: 16
-  lora_alpha: 32
-  lora_dropout: 0
-  bias: "none"
-  use_gradient_checkpointing: true
