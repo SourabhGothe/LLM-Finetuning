@@ -4,7 +4,7 @@
 import os
 import sys
 
-# FIX: Add project root to the Python path
+# Add project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -22,14 +22,17 @@ PROMPT_TEMPLATE = """Below is a graph describing a set of entities and their rel
 ### Description:
 {}"""
 
-def load_and_prepare_dataset(cfg: DictConfig, tokenizer) -> DatasetDict:
+def load_and_prepare_dataset(cfg: DictConfig, tokenizer) -> tuple[DatasetDict, Dataset]:
     """
     Loads the WebNLG dataset from the Hugging Face Hub, applies linearization and formatting.
-    This replaces the need for the download_data.sh script.
+    
+    Returns:
+        A tuple containing:
+        1. The processed dataset ready for the SFTTrainer.
+        2. The raw, unprocessed validation dataset for use in callbacks.
     """
     print(f"Loading dataset '{cfg.dataset.name}' from the Hugging Face Hub...")
     
-    # Load the specific subset of the dataset from the hub
     raw_datasets = load_dataset(cfg.dataset.name, cfg.dataset.subset, split=['train', 'dev'])
     dataset_dict = DatasetDict({
         'train': raw_datasets[0],
@@ -39,17 +42,12 @@ def load_and_prepare_dataset(cfg: DictConfig, tokenizer) -> DatasetDict:
     linearizer = get_linearizer(cfg.dataset.linearization_strategy)
     
     def format_prompt(entry):
-        # The structure from the hub is slightly different
-        triples = entry['modified_triple_sets']['mtriple_set'][0]
-        # We need to manually re-package the entry for the existing linearizers
-        repackaged_entry = {'modified_triple_sets': {'mtriple_set': [triples]}}
-        linearized_graph = linearizer(repackaged_entry)
-        
-        # Get one of the reference texts as the target
+        linearized_graph = linearizer(entry)
         target_text = entry['lex']['text'][0]
         
-        # Create the full prompt using the Alpaca template
-        full_prompt = PROMPT_TEMPLATE.format(linearized_graph, target_text)
+        # Explicitly add the EOS token to the end of the text.
+        # This makes the separation between prompt and completion unambiguous for the SFTTrainer.
+        full_prompt = PROMPT_TEMPLATE.format(linearized_graph, target_text) + tokenizer.eos_token
         
         return {cfg.dataset.text_col: full_prompt}
 
@@ -62,4 +60,5 @@ def load_and_prepare_dataset(cfg: DictConfig, tokenizer) -> DatasetDict:
     print("Dataset prepared.")
     print(f"Sample prompt:\n{processed_datasets['train'][0][cfg.dataset.text_col]}")
     
-    return processed_datasets
+    # Return both the processed dataset for training and the raw validation set for the callback
+    return processed_datasets, dataset_dict['validation']
