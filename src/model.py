@@ -8,12 +8,14 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# src/model.py
+# Handles loading the LLM and applying PEFT configuration.
+
 from unsloth import FastLanguageModel
-from peft import LoraConfig
-from typing import Dict, Any
+from omegaconf import OmegaConf
 import torch
 
-def load_model_for_training(cfg: Dict[str, Any]):
+def load_model_for_training(cfg):
     """
     Loads the model and tokenizer using Unsloth's FastLanguageModel,
     configured for QLoRA training.
@@ -28,18 +30,23 @@ def load_model_for_training(cfg: Dict[str, Any]):
     )
 
     print("Applying PEFT (LoRA) configuration...")
-    # It's important to do this step to enable gradient checkpointing and prepare the model for LoRA.
-    # This is an Unsloth-specific optimization.
+    
+    # FIX: target_modules is now optional.
+    # We use OmegaConf.get to safely access the key. If it's not found in any
+    # config file, it defaults to None. When target_modules is None,
+    # Unsloth automatically finds all linear layers to apply LoRA to,
+    # which is the most robust and recommended approach.
+    target_modules = OmegaConf.get(cfg, "peft.target_modules", None)
+    
     model = FastLanguageModel.get_peft_model(
         model,
         r=cfg.peft.r,
-        target_modules=cfg.peft.target_modules,
+        target_modules=target_modules,
         lora_alpha=cfg.peft.lora_alpha,
         lora_dropout=cfg.peft.lora_dropout,
         bias=cfg.peft.bias,
         use_gradient_checkpointing=cfg.peft.use_gradient_checkpointing,
         random_state=cfg.training.seed,
-        #task_type=cfg.peft.task_type,
     )
 
     print("Model and tokenizer are ready for training.")
