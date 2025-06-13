@@ -1,6 +1,6 @@
 # Experiment: DeepSeek-Coder-6.7B-Instruct with QLoRA on WebNLG
 
-# FIX: Explicitly include the base configuration.
+# Explicitly include the base configuration.
 defaults:
   - ../base_config.yaml
 
@@ -8,6 +8,7 @@ defaults:
 run_name: "deepseek_coder_6.7b_qlora_webnlg_3_epochs_${now:%Y-%m-%d_%H-%M-%S}"
 
 model:
+  # FIX: Verified the exact model name from the Unsloth repository on Hugging Face.
   name: "unsloth/deepseek-coder-6.7b-instruct-bnb-4bit"
   name_sanitized: "deepseek-coder-6-7b-instruct"
   max_seq_length: 2048
