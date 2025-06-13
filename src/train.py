@@ -33,7 +33,7 @@ from src.data_loader import load_and_prepare_dataset
 # FIX: The config_path now points directly to the 'experiment' directory.
 # The config_name will be the specific experiment file to run (e.g., 'deepseek_coder_qlora_webnlg').
 # Hydra will load this file, which in turn loads the base_config.
-@hydra.main(version_base=None, config_path="../configs/experiment", config_name="llama3_qlora_webnlg")
+@hydra.main(version_base=None, config_path="../configs/experiments", config_name="llama3_qlora_webnlg")
 def main(cfg: DictConfig) -> None:
     """
     Main training function.
