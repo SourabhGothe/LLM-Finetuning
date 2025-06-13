@@ -8,11 +8,8 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-import unsloth
-import os
-import sys
 # src/train.py
-# Main script to orchestrate the finetuning process. (Fixed Configuration)
+# Main script to orchestrate the finetuning process. (Final Version)
 
 import os
 import sys
@@ -30,10 +27,10 @@ from transformers import TrainingArguments
 from src.model import load_model_for_training
 from src.data_loader import load_and_prepare_dataset
 
-# FIX: The config_path now points directly to the 'experiment' directory.
-# The config_name will be the specific experiment file to run (e.g., 'deepseek_coder_qlora_webnlg').
-# Hydra will load this file, which in turn loads the base_config.
-@hydra.main(version_base=None, config_path="../configs/experiments", config_name="llama3_qlora_webnlg")
+# FIX: This is the correct decorator setup. It points to the main config directory
+# and loads the base_config.yaml. The run_experiment.sh script will then
+# correctly override the 'experiment' default.
+@hydra.main(version_base=None, config_path="../configs", config_name="base_config")
 def main(cfg: DictConfig) -> None:
     """
     Main training function.
@@ -42,7 +39,6 @@ def main(cfg: DictConfig) -> None:
     print("Loaded configuration:")
     print(OmegaConf.to_yaml(cfg))
     
-    # The rest of the script remains the same
     model, tokenizer = load_model_for_training(cfg)
     dataset = load_and_prepare_dataset(cfg, tokenizer)
 
@@ -81,7 +77,7 @@ def main(cfg: DictConfig) -> None:
     
     final_model_path = os.path.join(cfg.output_dir, "final_checkpoint")
     trainer.save_model(final_model_path)
-    print(f"Final model adapter saved to {final_model_path}")
+    print(f"\nFinal model adapter saved to {final_model_path}")
 
 
 if __name__ == "__main__":
