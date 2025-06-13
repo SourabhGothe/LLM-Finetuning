@@ -10,7 +10,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # src/train.py
 # Main script to orchestrate the finetuning process. (Final Version)
-
+import unsloth
 import os
 import sys
 import torch
