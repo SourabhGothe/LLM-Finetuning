@@ -17,7 +17,7 @@ echo "Running experiment: $EXPERIMENT_NAME"
 # Set PYTHONPATH to the project's root directory.
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-# FIX: Removed the '+' from '+experiment'.
-# The correct Hydra syntax to override a value from a config group
-# in the defaults list is just 'experiment=<value>'.
-python src/train.py experiment=$EXPERIMENT_NAME
+# FIX: Use --config-name to select the experiment file.
+# The train.py script's @hydra.main decorator points to the 'experiment'
+# directory, so this will load the correct file.
+python src/train.py --config-name=$EXPERIMENT_NAME
