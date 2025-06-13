@@ -1,10 +1,5 @@
 # Experiment: Llama-3 8B with QLoRA on WebNLG
 
-# FIX: Explicitly include the base configuration.
-defaults:
-  - ../base_config.yaml
-
-# This experiment's specific settings will override the base settings.
 run_name: "llama3_8b_qlora_webnlg_3_epochs_${now:%Y-%m-%d_%H-%M-%S}"
 
 model:
@@ -17,3 +12,6 @@ model:
 peft:
   r: 32
   lora_alpha: 64
+  lora_dropout: 0
+  bias: "none"
+  use_gradient_checkpointing: true
