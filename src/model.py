@@ -28,9 +28,6 @@ def load_model_for_training(cfg):
         load_in_4bit=cfg.model.load_in_4bit,
     )
 
-    # FIX: Explicitly set the padding token for the tokenizer.
-    # Llama-3 models do not have a default padding token. This is a critical step.
-    # We use the end-of-sequence (EOS) token as the padding token.
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         print("Set tokenizer.pad_token to tokenizer.eos_token")
@@ -38,24 +35,34 @@ def load_model_for_training(cfg):
 
     print("Applying PEFT (LoRA) configuration...")
     
-    # We default to None for target_modules to let Unsloth auto-detect them,
-    # which is the most robust approach.
-    try:
-        target_modules = cfg.peft.target_modules
-        print(f"Found manually specified target_modules: {target_modules}")
-    except AttributeError:
-        target_modules = None
-        print("`target_modules` not specified. Unsloth will auto-detect all linear layers.")
+    # FIX: This is the definitive fix for the TypeError.
+    # We check if `target_modules` is defined in the config.
+    # If it is, we pass it to the function.
+    # If it is NOT, we call the function WITHOUT the target_modules argument,
+    # which correctly triggers Unsloth's robust auto-detection.
     
+    peft_kwargs = {
+        "r": cfg.peft.r,
+        "lora_alpha": cfg.peft.lora_alpha,
+        "lora_dropout": cfg.peft.lora_dropout,
+        "bias": cfg.peft.bias,
+        "use_gradient_checkpointing": cfg.peft.use_gradient_checkpointing,
+        "random_state": cfg.training.seed,
+    }
+    
+    try:
+        # Check if the user has manually specified target_modules
+        peft_kwargs["target_modules"] = cfg.peft.target_modules
+        print(f"Found manually specified target_modules: {peft_kwargs['target_modules']}")
+    except AttributeError:
+        # If not specified, we don't add it to the kwargs,
+        # allowing Unsloth to auto-detect them.
+        print("`target_modules` not specified. Unsloth will auto-detect all linear layers.")
+        pass
+
     model = FastLanguageModel.get_peft_model(
         model,
-        r=cfg.peft.r,
-        target_modules=target_modules,
-        lora_alpha=cfg.peft.lora_alpha,
-        lora_dropout=cfg.peft.lora_dropout,
-        bias=cfg.peft.bias,
-        use_gradient_checkpointing=cfg.peft.use_gradient_checkpointing,
-        random_state=cfg.training.seed,
+        **peft_kwargs
     )
 
     print("Model and tokenizer are ready for training.")
