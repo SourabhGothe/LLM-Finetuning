@@ -58,63 +58,41 @@ class SampleGenerationCallback(TrainerCallback):
         with open(output_file_path, "w", encoding="utf-8") as f:
             for i, entry in enumerate(self.sample_dataset):
                 linearized_graph = self.linearizer(entry)
-                
-                # Use the chat template for generation to match training
-                messages = [{"role": "user", "content": INFERENCE_PROMPT_TEMPLATE.format(linearized_graph, "").strip()}]
-                prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-                
+                prompt = INFERENCE_PROMPT_TEMPLATE.format(linearized_graph)
                 inputs = self.tokenizer([prompt], return_tensors="pt").to(model.device)
                 with torch.no_grad():
                     outputs = model.generate(**inputs, max_new_tokens=150, use_cache=True, pad_token_id=self.tokenizer.pad_token_id, eos_token_id=self.tokenizer.eos_token_id)
                 decoded_output = self.tokenizer.batch_decode(outputs[:, inputs['input_ids'].shape[1]:], skip_special_tokens=True)[0]
-                
                 f.write(f"===== SAMPLE {i+1} =====\nINPUT GRAPH:\n{linearized_graph}\n\nMODEL OUTPUT:\n{decoded_output.strip()}\n\nREFERENCE:\n{entry['lex']['text'][0]}\n{'='*20}\n\n")
         print(f"Sample outputs saved to {output_file_path}")
         model.train()
 
-# FIX: This function now correctly formats the data into the chat template
-# that instruction-tuned models like Llama 3 expect. This is the key to
-# solving the zero-loss problem.
-def formatting_prompts_func(example, linearizer, tokenizer):
-    output_texts = []
-    for i in range(len(example['lex'])):
-        linearized_graph = linearizer(example)
-        target_text = example['lex']['text'][i]
-        
-        # Create the message structure for the chat template
-        messages = [
-            {"role": "user", "content": INFERENCE_PROMPT_TEMPLATE.format(linearized_graph, "").strip()},
-            {"role": "assistant", "content": target_text},
-        ]
-        output_texts.append(tokenizer.apply_chat_template(messages, tokenize=False))
-    return output_texts
-
-@hydra.main(version_base=None, config_path="../configs/experiment", config_name="llama3_qlora_webnlg")
+# FIX: The Hydra decorator is now simplified. It does not need to know the config path or name,
+# as this is now explicitly provided by the shell script for maximum robustness.
+@hydra.main(version_base=None)
 def main(cfg: DictConfig) -> None:
+    """
+    Main training function.
+    """
     print("--- Starting training process ---")
     print("Loaded configuration:")
     print(OmegaConf.to_yaml(cfg))
     
+    # The 'cfg' object is now the fully composed config from the chosen experiment file.
+    # No merging is needed.
     model, tokenizer = load_model_for_training(cfg)
-    train_dataset, validation_dataset = load_and_prepare_dataset(cfg, tokenizer)
-    
-    linearizer = get_linearizer(cfg.dataset.linearization_strategy)
-    
-    # Partially apply the linearizer and tokenizer to the formatting function
-    formatting_func_with_deps = lambda example: formatting_prompts_func(example, linearizer, tokenizer)
-    
-    sample_generation_callback = SampleGenerationCallback(validation_dataset, tokenizer, cfg)
+    processed_dataset, raw_validation_dataset = load_and_prepare_dataset(cfg, tokenizer)
+    sample_generation_callback = SampleGenerationCallback(raw_validation_dataset, tokenizer, cfg)
 
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
-        train_dataset=train_dataset,
-        eval_dataset=validation_dataset,
-        # Use the robust formatting function instead of a simple text field
-        formatting_func=formatting_func_with_deps,
+        train_dataset=processed_dataset["train"],
+        eval_dataset=processed_dataset["validation"],
+        dataset_text_field=cfg.dataset.text_col,
         max_seq_length=cfg.model.max_seq_length,
         dataset_num_proc=2,
-        packing=True, # We can use packing now with the formatting function
+        packing=False,
         callbacks=[sample_generation_callback],
         args=TrainingArguments(
             per_device_train_batch_size=cfg.training.per_device_train_batch_size,
@@ -124,11 +102,11 @@ def main(cfg: DictConfig) -> None:
             learning_rate=cfg.training.learning_rate,
             fp16=not cfg.training.bf16,
             bf16=cfg.training.bf16,
-            logging_steps=1,
-            optim="adamw_8bit",
-            weight_decay=0.01,
-            lr_scheduler_type="linear",
-            seed=42,
+            logging_steps=cfg.training.logging_steps,
+            optim=cfg.training.optim,
+            weight_decay=cfg.training.weight_decay,
+            lr_scheduler_type=cfg.training.lr_scheduler_type,
+            seed=cfg.training.seed,
             output_dir=cfg.output_dir,
             report_to="tensorboard",
         ),
