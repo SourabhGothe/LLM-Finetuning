@@ -29,7 +29,7 @@ from src.model import load_model_for_training
 from src.data_loader import load_and_prepare_dataset
 from src.linearize import get_linearizer
 
-# Define the inference prompt template used by the callback and formatting function
+# Define the inference prompt template used by the callback
 INFERENCE_PROMPT_TEMPLATE = """Below is a graph describing a set of entities and their relationships. Write a coherent and fluent paragraph that accurately describes this information.
 
 ### Graph:
@@ -58,69 +58,38 @@ class SampleGenerationCallback(TrainerCallback):
         with open(output_file_path, "w", encoding="utf-8") as f:
             for i, entry in enumerate(self.sample_dataset):
                 linearized_graph = self.linearizer(entry)
-                
-                # Use the chat template for generation to match training
                 messages = [{"role": "user", "content": INFERENCE_PROMPT_TEMPLATE.format(linearized_graph, "").strip()}]
                 prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-                
                 inputs = self.tokenizer([prompt], return_tensors="pt").to(model.device)
                 with torch.no_grad():
                     outputs = model.generate(**inputs, max_new_tokens=150, use_cache=True, pad_token_id=self.tokenizer.pad_token_id, eos_token_id=self.tokenizer.eos_token_id)
                 decoded_output = self.tokenizer.batch_decode(outputs[:, inputs['input_ids'].shape[1]:], skip_special_tokens=True)[0]
-                
                 f.write(f"===== SAMPLE {i+1} =====\nINPUT GRAPH:\n{linearized_graph}\n\nMODEL OUTPUT:\n{decoded_output.strip()}\n\nREFERENCE:\n{entry['lex']['text'][0]}\n{'='*20}\n\n")
         print(f"Sample outputs saved to {output_file_path}")
         model.train()
 
-# This function correctly formats the data into the chat template
-# that instruction-tuned models like Llama 3 expect.
-def formatting_prompts_func(example, linearizer, tokenizer):
-    output_texts = []
-    # The WebNLG dataset can have multiple reference texts for a single graph
-    for i in range(len(example['lex']['text'])):
-        linearized_graph = linearizer(example)
-        target_text = example['lex']['text'][i]
-        
-        # Create the message structure for the chat template
-        messages = [
-            {"role": "user", "content": INFERENCE_PROMPT_TEMPLATE.format(linearized_graph, "").strip()},
-            {"role": "assistant", "content": target_text},
-        ]
-        output_texts.append(tokenizer.apply_chat_template(messages, tokenize=False))
-    return {"text": output_texts}
-
 @hydra.main(version_base=None, config_path="../configs/experiment", config_name="llama3_qlora_webnlg")
 def main(cfg: DictConfig) -> None:
-    """
-    Main training function.
-    """
     print("--- Starting training process ---")
     print("Loaded configuration:")
     print(OmegaConf.to_yaml(cfg))
     
     model, tokenizer = load_model_for_training(cfg)
-    # The data loader now returns two separate, raw datasets
-    train_dataset, validation_dataset = load_and_prepare_dataset(cfg, tokenizer)
+    train_dataset, validation_dataset, raw_validation_for_callback = load_and_prepare_dataset(cfg, tokenizer)
     
-    linearizer = get_linearizer(cfg.dataset.linearization_strategy)
-    
-    # Partially apply the linearizer and tokenizer to the formatting function
-    formatting_func_with_deps = lambda example: formatting_prompts_func(example, linearizer, tokenizer)
-    
-    sample_generation_callback = SampleGenerationCallback(validation_dataset, tokenizer, cfg)
+    sample_generation_callback = SampleGenerationCallback(raw_validation_for_callback, tokenizer, cfg)
 
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
-        # FIX: Pass the raw datasets directly to the trainer.
-        # The new `formatting_func` handles all processing, which solves both
-        # the KeyError and the zero-loss problem.
         train_dataset=train_dataset,
         eval_dataset=validation_dataset,
-        formatting_func=formatting_func_with_deps,
+        # FIX: The dataset is now pre-formatted, so we use `dataset_text_field`.
+        # This resolves the ValueError.
+        dataset_text_field="text",
         max_seq_length=cfg.model.max_seq_length,
         dataset_num_proc=2,
-        packing=True, # We can use packing now for more efficiency
+        packing=False, # Packing is simpler to set to False with pre-formatted datasets
         callbacks=[sample_generation_callback],
         args=TrainingArguments(
             per_device_train_batch_size=cfg.training.per_device_train_batch_size,
