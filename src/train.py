@@ -84,19 +84,20 @@ def main(cfg: DictConfig) -> None:
         tokenizer=tokenizer,
         train_dataset=train_dataset,
         eval_dataset=validation_dataset,
-        # FIX: The dataset is now pre-formatted, so we use `dataset_text_field`.
-        # This resolves the ValueError.
         dataset_text_field="text",
         max_seq_length=cfg.model.max_seq_length,
         dataset_num_proc=2,
-        packing=False, # Packing is simpler to set to False with pre-formatted datasets
+        # FIX: Enable packing for more efficient training.
+        packing=True,
         callbacks=[sample_generation_callback],
         args=TrainingArguments(
             per_device_train_batch_size=cfg.training.per_device_train_batch_size,
             gradient_accumulation_steps=cfg.training.gradient_accumulation_steps,
-            warmup_steps=cfg.training.warmup_steps,
+            # FIX: Increase warmup steps to stabilize initial training.
+            warmup_steps=50,
             num_train_epochs=cfg.training.num_train_epochs,
-            learning_rate=cfg.training.learning_rate,
+            # FIX: Lower the learning rate to prevent rapid overfitting.
+            learning_rate=2e-5,
             fp16=not cfg.training.bf16,
             bf16=cfg.training.bf16,
             logging_steps=1,
