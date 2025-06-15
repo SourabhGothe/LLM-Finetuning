@@ -1,0 +1,9 @@
+# Model Config: DeepSeek-R1-Distill-Qwen-14B
+
+run_name: "deepseek_qwen_14b_qlora_webnlg_3_epochs_${now:%Y-%m-%d_%H-%M-%S}"
+
+name: "unsloth/DeepSeek-R1-Distill-Qwen-14B"
+name_sanitized: "deepseek-r1-distill-qwen-14b"
+max_seq_length: 2048
+dtype: null
+load_in_4bit: true

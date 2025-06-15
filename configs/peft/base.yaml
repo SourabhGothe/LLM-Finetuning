@@ -1,0 +1,9 @@
+# Base PEFT (LoRA) Configuration
+
+r: 16
+lora_alpha: 32
+lora_dropout: 0
+bias: "none"
+use_gradient_checkpointing: true
+# target_modules is intentionally omitted to allow Unsloth to auto-detect them,
+# which is the most robust method for handling different model architectures.

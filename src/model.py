@@ -35,12 +35,8 @@ def load_model_for_training(cfg):
 
     print("Applying PEFT (LoRA) configuration...")
     
-    # FIX: This is the definitive fix for the TypeError.
-    # We check if `target_modules` is defined in the config.
-    # If it is, we pass it to the function.
-    # If it is NOT, we call the function WITHOUT the target_modules argument,
-    # which correctly triggers Unsloth's robust auto-detection.
-    
+    # This is the definitive fix for the optional target_modules.
+    # We build the kwargs dictionary and only add target_modules if it exists.
     peft_kwargs = {
         "r": cfg.peft.r,
         "lora_alpha": cfg.peft.lora_alpha,
@@ -50,20 +46,20 @@ def load_model_for_training(cfg):
         "random_state": cfg.training.seed,
     }
     
-    try:
-        # Check if the user has manually specified target_modules
+    # Use 'in' operator for safe checking
+    if "target_modules" in cfg.peft:
         peft_kwargs["target_modules"] = cfg.peft.target_modules
         print(f"Found manually specified target_modules: {peft_kwargs['target_modules']}")
-    except AttributeError:
-        # If not specified, we don't add it to the kwargs,
-        # allowing Unsloth to auto-detect them.
+    else:
         print("`target_modules` not specified. Unsloth will auto-detect all linear layers.")
-        pass
 
     model = FastLanguageModel.get_peft_model(
         model,
         **peft_kwargs
     )
+
+    # Print the number of trainable parameters
+    model.print_trainable_parameters()
 
     print("Model and tokenizer are ready for training.")
     return model, tokenizer

@@ -1,0 +1,20 @@
+# Main Configuration File
+# This file defines the overall structure of our experiments and loads default components.
+# The command line (`model=...`) will override the default model choice.
+
+defaults:
+  - model: llama3_qlora_webnlg
+  - training: base
+  - peft: base
+  - _self_
+
+# --- Paths and Directories ---
+# The output path is now cleaner and uses the model group name from the selected model config.
+output_dir: "outputs/${model.name_sanitized}/${model.run_name}"
+
+# --- Dataset and Dataloader ---
+dataset:
+  name: "web_nlg"
+  subset: "webnlg_challenge_2017"
+  text_col: "text"
+  linearization_strategy: "simple_concise"

@@ -47,24 +47,15 @@ class SampleGenerationCallback(TrainerCallback):
         self.tokenizer = tokenizer
         self.linearizer = get_linearizer(cfg.dataset.linearization_strategy)
         self.cfg = cfg
-
-        # FIX: Define a robust generation configuration to prevent garbage output
-        # and encourage better, more creative responses.
         self.generation_config = GenerationConfig(
-            max_new_tokens=150,
-            temperature=0.7,          # A little creativity
-            top_p=0.9,                # Nucleus sampling
-            repetition_penalty=1.15,  # Penalize repeating tokens
-            use_cache=True,
-            pad_token_id=self.tokenizer.pad_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            do_sample=True            # Enable sampling
+            max_new_tokens=150, temperature=0.7, top_p=0.9, repetition_penalty=1.15,
+            use_cache=True, pad_token_id=self.tokenizer.pad_token_id, eos_token_id=self.tokenizer.eos_token_id, do_sample=True
         )
 
     def on_epoch_end(self, args, state, control, model, **kwargs):
         if not state.is_world_process_zero: return
         print(f"\n--- Generating samples for epoch {int(state.epoch)} ---")
-        output_dir = self.cfg.output_dir
+        output_dir = args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         output_file_path = os.path.join(output_dir, f"sample_outputs_epoch_{int(state.epoch)}.txt")
         model.eval()
@@ -75,16 +66,16 @@ class SampleGenerationCallback(TrainerCallback):
                 prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
                 inputs = self.tokenizer([prompt], return_tensors="pt").to(model.device)
                 with torch.no_grad():
-                    # Use the pre-defined generation config
                     outputs = model.generate(**inputs, generation_config=self.generation_config)
                 decoded_output = self.tokenizer.batch_decode(outputs[:, inputs['input_ids'].shape[1]:], skip_special_tokens=True)[0]
                 f.write(f"===== SAMPLE {i+1} =====\nINPUT GRAPH:\n{linearized_graph}\n\nMODEL OUTPUT:\n{decoded_output.strip()}\n\nREFERENCE:\n{entry['lex']['text'][0]}\n{'='*20}\n\n")
         print(f"Sample outputs saved to {output_file_path}")
         model.train()
 
-@hydra.main(version_base=None, config_path="../configs/experiment", config_name="llama3_qlora_webnlg")
+@hydra.main(version_base=None, config_path="../configs", config_name="main_config")
 def main(cfg: DictConfig) -> None:
     print("--- Starting training process ---")
+    OmegaConf.resolve(cfg)
     print("Loaded configuration:")
     print(OmegaConf.to_yaml(cfg))
     
@@ -99,22 +90,27 @@ def main(cfg: DictConfig) -> None:
         eval_dataset=validation_dataset,
         dataset_text_field="text",
         max_seq_length=cfg.model.max_seq_length,
-        dataset_num_proc=2,
-        packing=True,
+        dataset_num_proc=os.cpu_count(),
+        # FIX: Disable packing. This is a crucial change for stability, especially with
+        # complex chat templates, and will prevent the "belowbelowbelow" issue.
+        packing=False,
         callbacks=[sample_generation_callback],
         args=TrainingArguments(
             per_device_train_batch_size=cfg.training.per_device_train_batch_size,
             gradient_accumulation_steps=cfg.training.gradient_accumulation_steps,
-            warmup_steps=50,
+            warmup_steps=cfg.training.warmup_steps,
             num_train_epochs=cfg.training.num_train_epochs,
-            learning_rate=2e-5, # A lower, more stable learning rate
+            learning_rate=cfg.training.learning_rate,
             fp16=not cfg.training.bf16,
             bf16=cfg.training.bf16,
-            logging_steps=1,
-            optim="adamw_8bit",
-            weight_decay=0.01,
-            lr_scheduler_type="linear",
-            seed=42,
+            logging_steps=5, # Log less frequently to keep the logs cleaner
+            optim=cfg.training.optim,
+            weight_decay=cfg.training.weight_decay,
+            # FIX: Add gradient clipping for training stability.
+            # This prevents exploding gradients which can lead to garbage output.
+            max_grad_norm=0.3,
+            lr_scheduler_type=cfg.training.lr_scheduler_type,
+            seed=cfg.training.seed,
             output_dir=cfg.output_dir,
             report_to="tensorboard",
         ),

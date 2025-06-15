@@ -1,0 +1,16 @@
+# "Strict" Training Configuration for smaller models
+# This uses a lower learning rate to combat hallucination and force the model
+# to adhere more closely to the provided data.
+
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 4
+warmup_steps: 50
+num_train_epochs: 3
+learning_rate: 5e-6  # A much lower learning rate for more stable learning
+fp16: false
+bf16: true
+logging_steps: 1
+optim: "adamw_8bit"
+weight_decay: 0.01
+lr_scheduler_type: "linear"
+seed: 42
